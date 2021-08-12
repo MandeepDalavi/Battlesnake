@@ -42,13 +42,57 @@ class Battlesnake(object):
         # Valid moves are "up", "down", "left", or "right".
         # TODO: Use the information in cherrypy.request.json to decide your next move.
         data = cherrypy.request.json
+        body = data["you"]["body"]
 
         # Choose a random direction to move in
         possible_moves = ["up", "down", "left", "right"]
-        move = random.choice(possible_moves)
+        safe_moves = self.getSafeMoves(possible_moves, body, data["board"])
 
-        print(f"MOVE: {move}")
-        return {"move": move}
+        if safe_moves:
+          move = random.choice(safe_moves)
+          return {"move" : move}
+
+        return {"move" : 'up'}
+
+    def getNext(self, currentHead, nextMove):
+        futureHead = currentHead.copy()
+        if nextMove == 'left':
+            futureHead['x'] = currentHead['x'] - 1
+        if nextMove == 'right':
+            futureHead['x'] = currentHead['x'] + 1
+        if nextMove == 'up':
+            futureHead['y'] = currentHead['y'] + 1
+        if nextMove == 'down':
+            futureHead['y'] = currentHead['y'] - 1
+        return futureHead
+    
+    def getSafeMoves(self, possible_moves, body, board):
+        safe_moves = []
+
+        for guess in possible_moves:
+            # check if we make this move, will the decisions
+            guessCoord = self.getNext(body[0], guess)
+            if self.avoidWalls(guessCoord, board["width"], board["height"]) and self.avoidSnakes(guessCoord, board["snakes"]):
+                safe_moves.append(guess)
+            elif len(body)>1 and guessCoord == body[-1] and guess not in body[:-1]:
+                safe_moves.append(guess)
+        return safe_moves
+
+    def avoidWalls(self, futureHead, width, height):
+        result = True
+        x = int(futureHead['x'])
+        y = int(futureHead['y'])
+
+        if x < 0 or y < 0 or x >= width or y >= height:
+            result = False
+
+        return result
+
+    def avoidSnakes(self, futureHead, snakeBodies):
+        for snake in snakeBodies:
+            if futureHead in snake["body"][:-1]:
+                return False
+            return True
 
     @cherrypy.expose
     @cherrypy.tools.json_in()
